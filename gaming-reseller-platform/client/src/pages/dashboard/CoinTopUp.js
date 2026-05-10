@@ -72,7 +72,7 @@ export default function CoinTopUp() {
               color: 'white', padding: '8px 16px', borderRadius: 8,
               fontWeight: 700, fontSize: 16, fontFamily: 'Orbitron, monospace'
             }}>
-              ${pkg.price.toFixed(2)}
+              Rs. {pkg.priceLKR?.toLocaleString()}
             </div>
           </div>
         ))}
@@ -115,7 +115,7 @@ export default function CoinTopUp() {
             <div style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 4 }}>Amount</div>
               <div className="font-gaming" style={{ color: 'var(--green)', fontWeight: 700 }}>
-                ${selectedPackage.price.toFixed(2)}
+                Rs. {selectedPackage.priceLKR?.toLocaleString()}
               </div>
             </div>
           </div>

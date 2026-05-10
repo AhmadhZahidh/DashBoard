@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
-import { FiShoppingBag, FiCreditCard, FiTrendingUp, FiPackage, FiKey, FiStar, FiArrowRight } from 'react-icons/fi';
+import { listenAnnouncements } from '../../firebase';
+import { FiShoppingBag, FiCreditCard, FiArrowRight, FiRadio } from 'react-icons/fi';
+import { SkeletonCard } from '../../components/LoadingScreen';
+import ParticlesBG from '../../components/ParticlesBG';
 
 export default function Dashboard() {
   const { user, refreshUser } = useAuth();
@@ -14,20 +17,21 @@ export default function Dashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
+  // Firebase real-time announcements
+  useEffect(() => {
+    const unsub = listenAnnouncements(setAnnouncements);
+    return unsub;
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
     socket.on('balance_updated', () => refreshUser());
-    socket.on('new_announcement', ann => setAnnouncements(p => [ann, ...p]));
-    return () => { socket.off('balance_updated'); socket.off('new_announcement'); };
+    return () => { socket.off('balance_updated'); };
   }, [socket]);
 
   const fetchData = async () => {
     try {
-      const [a, p] = await Promise.all([
-        axios.get('/api/announcements'),
-        axios.get('/api/products?hot=true&limit=6')
-      ]);
-      setAnnouncements(a.data.announcements || []);
+      const p = await axios.get('/api/products?hot=true&limit=6');
       setHotProducts(p.data.products || []);
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -147,7 +151,7 @@ export default function Dashboard() {
                       <span style={{ fontWeight: 700, fontSize: 14, color: '#fff', fontFamily: 'Space Grotesk,sans-serif' }}>{ann.title}</span>
                     </div>
                     <span style={{ color: 'var(--text-muted)', fontSize: 11, flexShrink: 0, marginLeft: 8 }}>
-                      {new Date(ann.createdAt).toLocaleDateString()}
+                      {ann.timestamp ? new Date(typeof ann.timestamp === 'object' ? ann.timestamp.seconds * 1000 : ann.timestamp).toLocaleDateString() : new Date(ann.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5 }}>{ann.message}</p>

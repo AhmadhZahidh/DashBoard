@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { FiPlus, FiTrash2, FiEdit2, FiX } from 'react-icons/fi';
+import { pushAnnouncement } from '../../firebase';
 
 const emptyAnn = { title: '', message: '', type: 'info', icon: '📢', isPinned: false, isActive: true };
 
@@ -38,6 +39,8 @@ export default function AdminAnnouncements() {
         toast.success('Announcement updated!');
       } else {
         await axios.post('/api/announcements', form);
+        // Also push to Firebase for real-time dashboard updates
+        await pushAnnouncement({ title: form.title, message: form.message, type: form.type, icon: form.icon }).catch(() => {});
         toast.success('Announcement created!');
       }
       setShowModal(false);

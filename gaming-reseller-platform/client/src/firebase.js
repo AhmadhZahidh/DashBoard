@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import {
   getDatabase, ref, push, onValue, off, serverTimestamp,
-  query, orderByChild, limitToLast, set, update, get, remove, onDisconnect
+  query, orderByChild, limitToLast, set, update, remove, onDisconnect
 } from 'firebase/database';
 
 const firebaseConfig = {
@@ -11,29 +11,42 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 
-// ─── GLOBAL CHAT (public room) ────────────────────────────────
-export const sendGlobalMessage = (userId, username, role, message, avatar) =>
+// ─── GLOBAL CHAT ──────────────────────────────────────────────
+export const sendGlobalMessage = (userId, username, role, message, avatar, type = 'text', imageUrl = '') =>
   push(ref(db, 'globalChat/messages'), {
     userId, username, role, message, avatar: avatar || '',
-    timestamp: serverTimestamp(), deleted: false
+    type, imageUrl, timestamp: serverTimestamp(), deleted: false, reactions: {}
   });
 
 export const listenGlobalMessages = (callback) => {
-  const q = query(ref(db, 'globalChat/messages'), orderByChild('timestamp'), limitToLast(100));
-  onValue(q, snap => {
+  const q = query(ref(db, 'globalChat/messages'), orderByChild('timestamp'), limitToLast(150));
+  const handler = (snap) => {
     const msgs = [];
     snap.forEach(c => msgs.push({ id: c.key, ...c.val() }));
     callback(msgs);
-  });
-  return () => off(q);
+  };
+  onValue(q, handler);
+  return () => off(q, 'value', handler);
 };
 
 export const deleteGlobalMessage = (msgId) =>
-  update(ref(db, `globalChat/messages/${msgId}`), { deleted: true, message: '[Message deleted]' });
+  update(ref(db, `globalChat/messages/${msgId}`), { deleted: true, message: '[Message deleted by admin]' });
 
-// ─── TYPING INDICATOR ─────────────────────────────────────────
-export const setTyping = (userId, username, isTyping) =>
-  set(ref(db, `globalChat/typing/${userId}`), isTyping ? { username, timestamp: Date.now() } : null);
+export const addReaction = (msgId, userId, emoji) => {
+  const r = ref(db, `globalChat/messages/${msgId}/reactions/${userId}`);
+  return set(r, emoji);
+};
+
+export const removeReaction = (msgId, userId) =>
+  remove(ref(db, `globalChat/messages/${msgId}/reactions/${userId}`));
+
+// ─── TYPING ───────────────────────────────────────────────────
+export const setTyping = (userId, username, isTyping) => {
+  const r = ref(db, `globalChat/typing/${userId}`);
+  return isTyping
+    ? set(r, { username, timestamp: Date.now() })
+    : remove(r);
+};
 
 export const listenTyping = (currentUserId, callback) => {
   const r = ref(db, 'globalChat/typing');
@@ -42,7 +55,7 @@ export const listenTyping = (currentUserId, callback) => {
     snap.forEach(c => {
       if (c.key !== currentUserId) {
         const v = c.val();
-        if (v && Date.now() - v.timestamp < 4000) typers.push(v.username);
+        if (v && Date.now() - v.timestamp < 5000) typers.push(v.username);
       }
     });
     callback(typers);
@@ -50,7 +63,7 @@ export const listenTyping = (currentUserId, callback) => {
   return () => off(r);
 };
 
-// ─── ONLINE PRESENCE ──────────────────────────────────────────
+// ─── PRESENCE ─────────────────────────────────────────────────
 export const setOnline = async (userId, username, role, avatar) => {
   const r = ref(db, `presence/${userId}`);
   await set(r, { userId, username, role, avatar: avatar || '', online: true, joinedAt: serverTimestamp() });
@@ -69,10 +82,10 @@ export const listenOnline = (callback) => {
   return () => off(r);
 };
 
-// ─── PRIVATE CHAT (admin ↔ user) ──────────────────────────────
-export const sendPrivateMessage = (roomId, senderId, senderName, senderRole, message) =>
+// ─── PRIVATE CHAT ─────────────────────────────────────────────
+export const sendPrivateMessage = (roomId, senderId, senderName, senderRole, message, imageUrl = '') =>
   push(ref(db, `privateChats/${roomId}/messages`), {
-    senderId, senderName, senderRole, message,
+    senderId, senderName, senderRole, message, imageUrl,
     timestamp: serverTimestamp(), isRead: false
   });
 
